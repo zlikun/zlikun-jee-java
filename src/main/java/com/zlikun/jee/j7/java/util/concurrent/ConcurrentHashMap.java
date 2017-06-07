@@ -8,6 +8,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
+ * 参考资料：
+ *      http://ifeve.com/concurrenthashmap/
+ *
  * @see java.util.concurrent.ConcurrentHashMap
  * @auther zlikun <zlikun-dev@hotmail.com>
  * @date 2017/6/6 10:58
