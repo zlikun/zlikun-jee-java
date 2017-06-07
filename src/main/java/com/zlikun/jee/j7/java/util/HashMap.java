@@ -73,7 +73,7 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
      * the HashMap or otherwise modify its internal structure (e.g.,
      * rehash).  This field is used to make iterators on Collection-views of
      * the HashMap fail-fast.  (See ConcurrentModificationException).
-     * HashMap扩容(变更)次数
+     * HashMap变更次数，添加元素时，键哈希值是一个新值，参考#put()方法
      */
     transient int modCount;
 
@@ -403,11 +403,16 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
         if (key == null)
             return putForNullKey(value);
         // HashMap实例是一个哈希数组，使用键的哈希值作为数组索引(该算法与容量必须是2的整数次幂有关)
+        // 计算key的哈希值
         int hash = hash(key);
-        // 好吧，个人对移位运算符和与或非运算符不太懂 !!!
+        // 好吧，个人对二进制运算符不太懂 !!!
         int i = indexFor(hash, table.length);
+        // 相同索引(通过哈希码计算得到)，可能存在不只一个数据(哈希)
+        // 所以此处是一个链表，用于存放相同哈希码但键并不相同的数据，
+        // 添加键值对如果键哈希值所属链表存在，且键相同，则重新赋值，并返回旧值
         for (Entry<K,V> e = table[i]; e != null; e = e.next) {
             Object k;
+            // 比较哈希码
             if (e.hash == hash && ((k = e.key) == key || key.equals(k))) {
                 V oldValue = e.value;
                 e.value = value;
@@ -417,6 +422,8 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
         }
 
         modCount++;
+
+        // 添加Entry，包含两种情况：1、键哈希值未命中的(新值)，2、键哈希值命中，但对应链表中不包含新键的
         addEntry(hash, key, value, i);
         return null;
     }
@@ -488,6 +495,7 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
      *        must be greater than current capacity unless current
      *        capacity is MAXIMUM_CAPACITY (in which case value
      *        is irrelevant).
+     * 扩容逻辑，新容量必须是2的整数次幂
      */
     void resize(int newCapacity) {
         Entry[] oldTable = table;
@@ -496,10 +504,12 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
             threshold = Integer.MAX_VALUE;
             return;
         }
-
+        // 创建一个新的哈希表，容量为传入的新容量
         Entry[] newTable = new Entry[newCapacity];
+        // 将原哈希表中数据重新计算哈希并填充到新表中
         transfer(newTable, initHashSeedAsNeeded(newCapacity));
         table = newTable;
+        // 重新计算阈值
         threshold = (int)Math.min(newCapacity * loadFactor, MAXIMUM_CAPACITY + 1);
     }
 
@@ -726,6 +736,7 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
 
         /**
          * Creates new entry.
+         * 将一个Entry实例置为链表的末尾
          */
         Entry(int h, K k, V v, Entry<K,V> n) {
             value = v;
@@ -795,12 +806,17 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
      * Subclass overrides this to alter the behavior of put method.
      */
     void addEntry(int hash, K key, V value, int bucketIndex) {
+        // 当前实际元素个数大于阈值，且指定索引对应链表非空，执行扩容
         if ((size >= threshold) && (null != table[bucketIndex])) {
+            // 执行扩容，扩容后容量为原容量2倍(并完成重新哈希并填充扩容容器)
             resize(2 * table.length);
+            // 重新计算哈希值
             hash = (null != key) ? hash(key) : 0;
+            // 重新计算索引(链表桶)
             bucketIndex = indexFor(hash, table.length);
         }
 
+        // 创建一个Entry，并将元素放入Entry链表末尾(如果是新添加的末尾也是头部)
         createEntry(hash, key, value, bucketIndex);
     }
 
@@ -814,6 +830,7 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
      */
     void createEntry(int hash, K key, V value, int bucketIndex) {
         Entry<K,V> e = table[bucketIndex];
+        // 如果是第一次添加，e实际值为空，即：链表的下一个元素为空，那么当前Entry即为链表头部
         table[bucketIndex] = new Entry<>(hash, key, value, e);
         size++;
     }
@@ -1105,4 +1122,21 @@ public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneabl
     // These methods are used when serializing HashSets
     int   capacity()     { return table.length; }
     float loadFactor()   { return loadFactor;   }
+
+    // -------------------- 自定义方法，用于观察HashMap内部变量值变化 ----------------------
+    public int _getModCount() {
+        return this.modCount ;
+    }
+
+    public int _getTableLength() {
+        return this.table.length ;
+    }
+
+    public int _getThreshold() {
+        return this.threshold ;
+    }
+
+    public float _getLoadFactor() {
+        return this.loadFactor ;
+    }
 }
